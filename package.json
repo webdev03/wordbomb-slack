@@ -3,7 +3,10 @@
   "module": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env src/index.js"
+    "start": "node --env-file=.env src/index.js",
+    "check": "eslint src/ && prettier . --write",
+    "lint": "eslint src/",
+    "prettier": "prettier . --write"
   },
   "dependencies": {
     "@slack/bolt": "^3.19.0"
@@ -11,6 +14,8 @@
   "devDependencies": {
     "@eslint/js": "^9.7.0",
     "eslint": "^9.7.0",
-    "globals": "^15.8.0"
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.8.0",
+    "prettier": "3.3.3"
   }
 }
