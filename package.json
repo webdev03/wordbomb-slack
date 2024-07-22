@@ -1,11 +1,11 @@
 {
   "name": "wordbomb-slack",
-  "module": "src/index.ts",
+  "module": "src/index.js",
   "type": "module",
-  "devDependencies": {
-    "@types/bun": "latest"
+  "scripts": {
+    "start": "node --env-file=.env src/index.js"
   },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
+  "dependencies": {
+    "@slack/bolt": "^3.19.0"
   }
 }

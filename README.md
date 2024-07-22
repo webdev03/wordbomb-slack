@@ -1,9 +1,9 @@
 # wordbomb-slack
 
-To install dependencies:
+You need Node.js for this, preferably 22:
 
 ```bash
-bun install
+npm install
 ```
 
 To run:
