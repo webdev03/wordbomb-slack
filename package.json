@@ -3,13 +3,14 @@
   "module": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env src/index.js",
+    "start": "node --import=tsx --env-file=.env src/index.ts",
     "check": "eslint src/ && prettier . --write",
     "lint": "eslint src/",
     "prettier": "prettier . --write"
   },
   "dependencies": {
-    "@slack/bolt": "^3.19.0"
+    "@slack/bolt": "^3.19.0",
+    "tsx": "^4.16.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.7.0",
