@@ -6,8 +6,20 @@ const app = new bolt.App({
   appToken: process.env.SLACK_APP_TOKEN,
 });
 
-app.message("hello", async ({ message, say }) => {
-  if (message.subtype === undefined) await say(`Hello <@${message.user}>!`);
-});
+const games = new Map<string, Game>();
+
+type Game = {
+  /**
+   * Array of players' Slack IDs
+   */
+  players: string[];
+}
+
+// Command handling
+
+app.command("/wb-create-game", async ({ command, ack, respond, say }) => {
+  await ack();
+  await respond("Hi!");
+})
 
 await app.start();
