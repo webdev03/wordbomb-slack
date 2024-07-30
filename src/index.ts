@@ -1,6 +1,9 @@
 const BASE_LIVES = 2;
+const TIME_MS = 6000;
 
 import bolt from "@slack/bolt";
+
+import prompts from "./prompts";
 import wordsListPath from "word-list";
 const words = (await import("fs")).readFileSync(wordsListPath, 'utf8').split('\n');
 
@@ -40,6 +43,14 @@ type Game = {
    */
   currentPlayer: number;
   /**
+   * The timestamp (Date.now()) when the current player's turn started
+   */
+  turnStartTime: number;
+  /**
+   * The current prompt
+   */
+  currentPrompt: string;
+  /**
    * Data about the initial message
    */
   initMessage: {
@@ -65,7 +76,7 @@ app.command("/wb-create-game", async ({ command, client, ack }) => {
   } else {
     const gameMessage = await client.chat.postMessage({
       channel: command.channel_id,
-      text: `${command.user_name} started a game!`,
+      text: `${command.user_name} created a game!`,
       blocks: [
         {
           type: "rich_text",
@@ -76,7 +87,7 @@ app.command("/wb-create-game", async ({ command, client, ack }) => {
               user_id: command.user_id
             }, {
               type: "text",
-              text: " started a game!"
+              text: " created a game!"
             }]
           }]
         },
@@ -86,6 +97,10 @@ app.command("/wb-create-game", async ({ command, client, ack }) => {
             {
               type: "mrkdwn",
               text: "*Players:*"
+            },
+            {
+              type: "mrkdwn",
+              text: `<@${command.user_id}>`
             }
           ]
         },
@@ -99,7 +114,8 @@ app.command("/wb-create-game", async ({ command, client, ack }) => {
                 "text": "Join"
               },
               "style": "primary",
-              "value": "join_game"
+              "value": "join_game",
+              action_id: "join_game"
             },
             {
               type: "button",
@@ -108,7 +124,8 @@ app.command("/wb-create-game", async ({ command, client, ack }) => {
                 "emoji": true,
                 "text": "Start"
               },
-              "value": "start_game"
+              "value": "start_game",
+              action_id: "start_game"
             }
           ]
         }
@@ -125,6 +142,8 @@ app.command("/wb-create-game", async ({ command, client, ack }) => {
       ],
       started: false,
       currentPlayer: 0,
+      turnStartTime: Date.now(),
+      currentPrompt: prompts[0],
       usedWords: [],
       initMessage: {
         channel_id: command.channel_id,
@@ -149,6 +168,14 @@ app.action('join_game', async ({ ack, body, client }) => {
     });
     return;
   }
+  if(game.started) {
+    await client.chat.postEphemeral({
+      channel: body.channel.id,
+      user: body.user.id,
+      text: "This game has already started!"
+    });
+    return;
+  }
   if(game.players.find((x) => x.id === body.user.id)) {
     await client.chat.postEphemeral({
       channel: body.channel.id,
@@ -161,10 +188,10 @@ app.action('join_game', async ({ ack, body, client }) => {
     id: body.user.id,
     lives: BASE_LIVES
   });
-  client.chat.update({
+  await client.chat.update({
     channel: game.initMessage.channel_id,
     ts: game.initMessage.ts,
-      text: `${game.initMessage.creator_name} started a game!`,
+      text: `${game.initMessage.creator_name} created a game!`,
       blocks: [
         {
           type: "rich_text",
@@ -175,7 +202,7 @@ app.action('join_game', async ({ ack, body, client }) => {
               user_id: game.initMessage.creator_id
             }, {
               type: "text",
-              text: " started a game!"
+              text: " created a game!"
             }]
           }]
         },
@@ -202,7 +229,8 @@ app.action('join_game', async ({ ack, body, client }) => {
                 "text": "Join"
               },
               "style": "primary",
-              "value": "join_game"
+              "value": "join_game",
+              action_id: "join_game"
             },
             {
               type: "button",
@@ -211,13 +239,77 @@ app.action('join_game', async ({ ack, body, client }) => {
                 "emoji": true,
                 "text": "Start"
               },
-              "value": "start_game"
+              "value": "start_game",
+              action_id: "start_game"
             }
           ]
         }
       ]
-  })
+  });
+  await client.chat.postEphemeral({
+    channel: body.channel.id,
+    user: body.user.id,
+    text: "Joined successfully! Run /wb-leave-game to leave this game!"
+  });
 });
 
+app.action('start_game', async ({ ack, body, client }) => {
+  if(body.channel?.id === undefined) throw Error("Button doesn't have a channel");
+  if(body.user?.id === undefined) throw Error("Button doesn't have a user");
+  const game = games.get(body.channel.id);
+  await ack();
+  if(!game) {
+    await client.chat.postEphemeral({
+      channel: body.channel.id,
+      user: body.user.id,
+      text: "Couldn't find the game!"
+    });
+    return;
+  }
+  if(game.started) {
+    await client.chat.postEphemeral({
+      channel: body.channel.id,
+      user: body.user.id,
+      text: "This game has already started!"
+    });
+    return;
+  }
+  if(game.initMessage.creator_id !== body.user.id) {
+    await client.chat.postEphemeral({
+      channel: body.channel.id,
+      user: body.user.id,
+      text: "You do not have permission to start this game! Only the person who ran /wb-create-game can start the game."
+    });
+    return;
+  }
+  game.started = true;
+  
+  mainGame(game);
+  client.chat
+  await client.chat.update({
+    channel: game.initMessage.channel_id,
+    ts: game.initMessage.ts,
+    text: `${game.initMessage.creator_name} started a game!`
+  });
+});
+
+async function mainGame(game: Game, continuePrompt = false) {
+  const { client } = app;
+
+  if(!continuePrompt) game.currentPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+  await client.chat.postMessage({
+    channel: game.initMessage.channel_id,
+    mrkdwn: true,
+    text: `<@${game.players[game.currentPlayer].id}>, it is your turn!\nThe current prompt is: *${game.currentPrompt}*.\nType a chat message to submit a word.\nYou have ${(TIME_MS / 1000).toFixed(1)} seconds.`
+  });
+  game.turnStartTime = Date.now();
+
+  setTimeout(async () => {
+    // TODO
+  }, TIME_MS)
+
+  game.currentPlayer++;
+  if(game.currentPlayer >= game.players.length) game.currentPlayer = 0;
+}
 
 await app.start();
